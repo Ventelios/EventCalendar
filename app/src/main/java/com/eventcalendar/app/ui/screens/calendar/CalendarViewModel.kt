@@ -1,0 +1,208 @@
+package com.eventcalendar.app.ui.screens.calendar
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.eventcalendar.app.data.local.entity.EventType
+import com.eventcalendar.app.data.local.entity.EventRecord
+import com.eventcalendar.app.data.repository.EventRepository
+import com.eventcalendar.app.data.repository.EventWithType
+import com.eventcalendar.app.ui.theme.EventColors
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.util.Calendar
+import javax.inject.Inject
+
+data class CalendarUiState(
+    val currentYear: Int = Calendar.getInstance().get(Calendar.YEAR),
+    val currentMonth: Int = Calendar.getInstance().get(Calendar.MONTH),
+    val selectedDate: Int? = null,
+    val selectedYear: Int = Calendar.getInstance().get(Calendar.YEAR),
+    val selectedMonth: Int = Calendar.getInstance().get(Calendar.MONTH),
+    val datesWithEvents: Set<Int> = emptySet(),
+    val selectedDateEvents: List<EventWithType> = emptyList(),
+    val eventTypes: List<EventType> = emptyList(),
+    val showAddEventDialog: Boolean = false,
+    val showEventListDialog: Boolean = false,
+    val showAddEventTypeDialog: Boolean = false,
+    val showMonthPickerDialog: Boolean = false,
+    val addEventYear: Int = Calendar.getInstance().get(Calendar.YEAR),
+    val addEventMonth: Int = Calendar.getInstance().get(Calendar.MONTH),
+    val addEventDay: Int = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+)
+
+@HiltViewModel
+class CalendarViewModel @Inject constructor(
+    private val repository: EventRepository
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(CalendarUiState())
+    val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
+
+    private val _datesWithEvents = MutableStateFlow<Set<Int>>(emptySet())
+    val datesWithEvents: StateFlow<Set<Int>> = _datesWithEvents.asStateFlow()
+
+    private val _selectedDateEvents = MutableStateFlow<List<EventWithType>>(emptyList())
+    val selectedDateEvents: StateFlow<List<EventWithType>> = _selectedDateEvents.asStateFlow()
+
+    init {
+        loadDatesWithEvents()
+        loadEventTypes()
+    }
+
+    private fun loadDatesWithEvents() {
+        viewModelScope.launch {
+            val state = _uiState.value
+            repository.getDatesWithEvents(state.currentYear, state.currentMonth)
+                .collect { dates ->
+                    _datesWithEvents.value = dates
+                }
+        }
+    }
+
+    private fun loadEventTypes() {
+        viewModelScope.launch {
+            repository.getAllEventTypes().collect { types ->
+                _uiState.value = _uiState.value.copy(eventTypes = types)
+            }
+        }
+    }
+
+    fun onMonthChange(year: Int, month: Int) {
+        _uiState.value = _uiState.value.copy(
+            currentYear = year,
+            currentMonth = month,
+            showMonthPickerDialog = false
+        )
+        loadDatesWithEvents()
+    }
+
+    fun onDateSelected(year: Int, month: Int, day: Int) {
+        _uiState.value = _uiState.value.copy(
+            selectedDate = day,
+            selectedYear = year,
+            selectedMonth = month,
+            showEventListDialog = true
+        )
+        loadEventsForSelectedDate(year, month, day)
+    }
+
+    private fun loadEventsForSelectedDate(year: Int, month: Int, day: Int) {
+        viewModelScope.launch {
+            repository.getRecordsByDate(year, month, day).collect { events ->
+                _selectedDateEvents.value = events
+            }
+        }
+    }
+
+    fun onAddEventClick() {
+        _uiState.value = _uiState.value.copy(showAddEventDialog = true)
+    }
+
+    fun onAddEventClickFromDialog() {
+        val state = _uiState.value
+        _uiState.value = state.copy(
+            showAddEventDialog = true,
+            showEventListDialog = false,
+            addEventYear = state.selectedYear,
+            addEventMonth = state.selectedMonth,
+            addEventDay = state.selectedDate ?: 1
+        )
+    }
+
+    fun onDismissAddEventDialog() {
+        _uiState.value = _uiState.value.copy(showAddEventDialog = false)
+    }
+
+    fun onDismissEventListDialog() {
+        _uiState.value = _uiState.value.copy(showEventListDialog = false, selectedDate = null)
+        _selectedDateEvents.value = emptyList()
+    }
+
+    fun onShowAddEventTypeDialog() {
+        _uiState.value = _uiState.value.copy(showAddEventTypeDialog = true)
+    }
+
+    fun onDismissAddEventTypeDialog() {
+        _uiState.value = _uiState.value.copy(showAddEventTypeDialog = false)
+    }
+
+    fun onShowMonthPickerDialog() {
+        _uiState.value = _uiState.value.copy(showMonthPickerDialog = true)
+    }
+
+    fun onDismissMonthPickerDialog() {
+        _uiState.value = _uiState.value.copy(showMonthPickerDialog = false)
+    }
+
+    fun addEventType(name: String, colorIndex: Int) {
+        viewModelScope.launch {
+            val color = EventColors.getOrElse(colorIndex) { EventColors[0] }
+            val colorLong = colorToLong(color)
+            val eventType = EventType(
+                name = name,
+                color = colorLong
+            )
+            repository.insertEventType(eventType)
+            _uiState.value = _uiState.value.copy(showAddEventTypeDialog = false)
+        }
+    }
+
+    private fun colorToLong(color: androidx.compose.ui.graphics.Color): Long {
+        val argb = color.value.toLong()
+        return if (argb < 0) argb + 0x100000000L else argb
+    }
+
+    fun addEventRecord(eventTypeId: Long, hour: Int, minute: Int, note: String) {
+        val state = _uiState.value
+        val calendar = Calendar.getInstance().apply {
+            set(state.addEventYear, state.addEventMonth, state.addEventDay, hour, minute, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        viewModelScope.launch {
+            val record = EventRecord(
+                eventTypeId = eventTypeId,
+                timestamp = calendar.timeInMillis,
+                note = note
+            )
+            repository.insertEventRecord(record)
+            _uiState.value = _uiState.value.copy(showAddEventDialog = false)
+            loadEventsForSelectedDate(state.addEventYear, state.addEventMonth, state.addEventDay)
+            loadDatesWithEvents()
+        }
+    }
+
+    fun addEventRecordNow(eventTypeId: Long, note: String) {
+        val state = _uiState.value
+        viewModelScope.launch {
+            val calendar = Calendar.getInstance().apply {
+                set(state.addEventYear, state.addEventMonth, state.addEventDay, 
+                    get(Calendar.HOUR_OF_DAY), get(Calendar.MINUTE), 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val record = EventRecord(
+                eventTypeId = eventTypeId,
+                timestamp = calendar.timeInMillis,
+                note = note
+            )
+            repository.insertEventRecord(record)
+            _uiState.value = _uiState.value.copy(showAddEventDialog = false)
+            loadEventsForSelectedDate(state.addEventYear, state.addEventMonth, state.addEventDay)
+            loadDatesWithEvents()
+        }
+    }
+
+    fun deleteEvent(event: EventWithType) {
+        viewModelScope.launch {
+            repository.deleteEventRecord(event.record)
+            val state = _uiState.value
+            if (state.selectedDate != null) {
+                loadEventsForSelectedDate(state.selectedYear, state.selectedMonth, state.selectedDate)
+            }
+            loadDatesWithEvents()
+        }
+    }
+}
