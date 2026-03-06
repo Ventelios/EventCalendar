@@ -22,6 +22,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,9 +36,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -54,6 +61,7 @@ fun HistoryScreen(
     viewModel: HistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showDeleteConfirmDialog by remember { mutableStateOf<EventWithType?>(null) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background
@@ -142,12 +150,48 @@ fun HistoryScreen(
                     items(uiState.filteredEvents) { eventWithType ->
                         ModernHistoryEventCard(
                             eventWithType = eventWithType,
-                            onDelete = { viewModel.deleteEvent(eventWithType) }
+                            onDelete = { showDeleteConfirmDialog = eventWithType }
                         )
                     }
                 }
             }
         }
+    }
+
+    showDeleteConfirmDialog?.let { eventToDelete ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = null },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = {
+                Text(
+                    text = "确认删除",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text("确定要删除这条「${eventToDelete.eventType.name}」记录吗？")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteEvent(eventToDelete)
+                        showDeleteConfirmDialog = null
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("删除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = null }) {
+                    Text("取消")
+                }
+            }
+        )
     }
 }
 

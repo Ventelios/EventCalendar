@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.eventcalendar.app.BuildConfig
 import com.eventcalendar.app.ui.theme.Primary
 import com.eventcalendar.app.ui.theme.PrimaryDark
 import com.eventcalendar.app.ui.theme.TextSecondary
@@ -174,7 +175,7 @@ private fun AppInfoCard() {
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "Event Calendar",
+                text = "循记",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = Primary
@@ -183,7 +184,7 @@ private fun AppInfoCard() {
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "v1.0.0",
+                text = "v${BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary
             )

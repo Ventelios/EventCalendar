@@ -1,4 +1,4 @@
-# Event Calendar 📅
+# 循记 PulseTempo 📅
 
 一个简洁优雅的 Android 日程记录应用，帮助你轻松记录和管理每日事件。
 

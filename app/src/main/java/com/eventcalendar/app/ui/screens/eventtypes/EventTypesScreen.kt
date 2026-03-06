@@ -61,6 +61,7 @@ fun EventTypesScreen(
     val eventTypes by viewModel.eventTypes.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var editingEventType by remember { mutableStateOf<EventType?>(null) }
+    var showDeleteConfirmDialog by remember { mutableStateOf<EventType?>(null) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -127,7 +128,7 @@ fun EventTypesScreen(
                     items(eventTypes) { eventType ->
                         EventTypeCard(
                             eventType = eventType,
-                            onDelete = { viewModel.deleteEventType(eventType) },
+                            onDelete = { showDeleteConfirmDialog = eventType },
                             onEdit = { editingEventType = eventType }
                         )
                     }
@@ -153,6 +154,42 @@ fun EventTypesScreen(
             onConfirm = { name, colorIndex ->
                 viewModel.updateEventType(eventType, name, colorIndex)
                 editingEventType = null
+            }
+        )
+    }
+
+    showDeleteConfirmDialog?.let { eventTypeToDelete ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = null },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = {
+                Text(
+                    text = "确认删除",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text("确定要删除「${eventTypeToDelete.name}」事件类型吗？\n该类型下的所有记录也将被删除。")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteEventType(eventTypeToDelete)
+                        showDeleteConfirmDialog = null
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("删除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = null }) {
+                    Text("取消")
+                }
             }
         )
     }

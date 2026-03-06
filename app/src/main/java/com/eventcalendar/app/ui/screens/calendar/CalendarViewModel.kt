@@ -18,14 +18,13 @@ import javax.inject.Inject
 data class CalendarUiState(
     val currentYear: Int = Calendar.getInstance().get(Calendar.YEAR),
     val currentMonth: Int = Calendar.getInstance().get(Calendar.MONTH),
-    val selectedDate: Int? = null,
+    val selectedDate: Int? = Calendar.getInstance().get(Calendar.DAY_OF_MONTH),
     val selectedYear: Int = Calendar.getInstance().get(Calendar.YEAR),
     val selectedMonth: Int = Calendar.getInstance().get(Calendar.MONTH),
     val datesWithEvents: Set<Int> = emptySet(),
     val selectedDateEvents: List<EventWithType> = emptyList(),
     val eventTypes: List<EventType> = emptyList(),
     val showAddEventDialog: Boolean = false,
-    val showEventListDialog: Boolean = false,
     val showAddEventTypeDialog: Boolean = false,
     val showMonthPickerDialog: Boolean = false,
     val addEventYear: Int = Calendar.getInstance().get(Calendar.YEAR),
@@ -40,16 +39,15 @@ class CalendarViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(CalendarUiState())
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
-
     private val _datesWithEvents = MutableStateFlow<Set<Int>>(emptySet())
     val datesWithEvents: StateFlow<Set<Int>> = _datesWithEvents.asStateFlow()
-
     private val _selectedDateEvents = MutableStateFlow<List<EventWithType>>(emptyList())
     val selectedDateEvents: StateFlow<List<EventWithType>> = _selectedDateEvents.asStateFlow()
-
+    
     init {
         loadDatesWithEvents()
         loadEventTypes()
+        loadTodayEvents()
     }
 
     private fun loadDatesWithEvents() {
@@ -70,21 +68,50 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
+    private fun loadTodayEvents() {
+        val today = Calendar.getInstance()
+        loadEventsForSelectedDate(
+            today.get(Calendar.YEAR),
+            today.get(Calendar.MONTH),
+            today.get(Calendar.DAY_OF_MONTH)
+        )
+    }
+
     fun onMonthChange(year: Int, month: Int) {
+        val currentState = _uiState.value
+        val calendar = Calendar.getInstance().apply {
+            set(year, month, 1)
+        }
+        val maxDayInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+        
+        val targetDay = if (currentState.selectedDate != null) {
+            minOf(currentState.selectedDate, maxDayInMonth)
+        } else {
+            val today = Calendar.getInstance()
+            if (year == today.get(Calendar.YEAR) && month == today.get(Calendar.MONTH)) {
+                today.get(Calendar.DAY_OF_MONTH)
+            } else {
+                1
+            }
+        }
+        
         _uiState.value = _uiState.value.copy(
             currentYear = year,
             currentMonth = month,
+            selectedDate = targetDay,
+            selectedYear = year,
+            selectedMonth = month,
             showMonthPickerDialog = false
         )
         loadDatesWithEvents()
+        loadEventsForSelectedDate(year, month, targetDay)
     }
 
     fun onDateSelected(year: Int, month: Int, day: Int) {
         _uiState.value = _uiState.value.copy(
             selectedDate = day,
             selectedYear = year,
-            selectedMonth = month,
-            showEventListDialog = true
+            selectedMonth = month
         )
         loadEventsForSelectedDate(year, month, day)
     }
@@ -98,27 +125,17 @@ class CalendarViewModel @Inject constructor(
     }
 
     fun onAddEventClick() {
-        _uiState.value = _uiState.value.copy(showAddEventDialog = true)
-    }
-
-    fun onAddEventClickFromDialog() {
         val state = _uiState.value
         _uiState.value = state.copy(
             showAddEventDialog = true,
-            showEventListDialog = false,
             addEventYear = state.selectedYear,
             addEventMonth = state.selectedMonth,
-            addEventDay = state.selectedDate ?: 1
+            addEventDay = state.selectedDate ?: Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
         )
     }
 
     fun onDismissAddEventDialog() {
         _uiState.value = _uiState.value.copy(showAddEventDialog = false)
-    }
-
-    fun onDismissEventListDialog() {
-        _uiState.value = _uiState.value.copy(showEventListDialog = false, selectedDate = null)
-        _selectedDateEvents.value = emptyList()
     }
 
     fun onShowAddEventTypeDialog() {

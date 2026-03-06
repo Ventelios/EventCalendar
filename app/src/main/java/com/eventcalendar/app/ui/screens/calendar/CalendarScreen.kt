@@ -1,5 +1,6 @@
 package com.eventcalendar.app.ui.screens.calendar
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,13 +18,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.EventNote
 import androidx.compose.material.icons.rounded.MoreVert
@@ -47,11 +52,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,11 +77,12 @@ import com.eventcalendar.app.data.repository.EventWithType
 import com.eventcalendar.app.ui.theme.EventColors
 import com.eventcalendar.app.ui.theme.Primary
 import com.eventcalendar.app.ui.theme.TextSecondary
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CalendarScreen(
     navController: NavController,
@@ -83,6 +91,25 @@ fun CalendarScreen(
     val uiState by viewModel.uiState.collectAsState()
     val datesWithEvents by viewModel.datesWithEvents.collectAsState()
     val selectedDateEvents by viewModel.selectedDateEvents.collectAsState()
+
+    val coroutineScope = rememberCoroutineScope()
+    
+    var showDeleteConfirmDialog by remember { mutableStateOf<EventWithType?>(null) }
+    
+    val initialPage = 1200
+    val pagerState = rememberPagerState(initialPage = initialPage) { 2400 }
+
+    LaunchedEffect(pagerState.currentPage) {
+        val pageOffset = pagerState.currentPage - initialPage
+        val calendar = Calendar.getInstance().apply {
+            add(Calendar.MONTH, pageOffset)
+        }
+        val newYear = calendar.get(Calendar.YEAR)
+        val newMonth = calendar.get(Calendar.MONTH)
+        if (newYear != uiState.currentYear || newMonth != uiState.currentMonth) {
+            viewModel.onMonthChange(newYear, newMonth)
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -109,7 +136,8 @@ fun CalendarScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.Top
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -129,26 +157,61 @@ fun CalendarScreen(
                     )
                 }
 
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable(onClick = { viewModel.onShowMonthPickerDialog() })
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "${uiState.currentYear}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TextSecondary,
-                        letterSpacing = 2.sp
-                    )
-                    val monthNames = listOf(
-                        "一月", "二月", "三月", "四月", "五月", "六月",
-                        "七月", "八月", "九月", "十月", "十一月", "十二月"
-                    )
-                    Text(
-                        text = monthNames[uiState.currentMonth],
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
+                    IconButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                            }
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.ChevronLeft,
+                            contentDescription = "上个月",
+                            tint = TextSecondary
+                        )
+                    }
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clickable(onClick = { viewModel.onShowMonthPickerDialog() })
+                    ) {
+                        Text(
+                            text = "${uiState.currentYear}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TextSecondary,
+                            letterSpacing = 2.sp
+                        )
+                        val monthNames = listOf(
+                            "一月", "二月", "三月", "四月", "五月", "六月",
+                            "七月", "八月", "九月", "十月", "十一月", "十二月"
+                        )
+                        Text(
+                            text = monthNames[uiState.currentMonth],
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                            }
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.ChevronRight,
+                            contentDescription = "下个月",
+                            tint = TextSecondary
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(40.dp))
@@ -160,28 +223,75 @@ fun CalendarScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            ModernCalendarGrid(
-                year = uiState.currentYear,
-                month = uiState.currentMonth,
-                datesWithEvents = datesWithEvents,
-                selectedDate = uiState.selectedDate,
-                onDateClick = { day ->
-                    viewModel.onDateSelected(uiState.currentYear, uiState.currentMonth, day)
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) { page ->
+                val pageOffset = page - initialPage
+                val calendar = Calendar.getInstance().apply {
+                    add(Calendar.MONTH, pageOffset)
                 }
-            )
+                val year = calendar.get(Calendar.YEAR)
+                val month = calendar.get(Calendar.MONTH)
+
+                ModernCalendarGrid(
+                    year = year,
+                    month = month,
+                    datesWithEvents = if (year == uiState.currentYear && month == uiState.currentMonth) datesWithEvents else emptySet(),
+                    selectedDate = if (year == uiState.currentYear && month == uiState.currentMonth) uiState.selectedDate else null,
+                    onDateClick = { day ->
+                        viewModel.onDateSelected(year, month, day)
+                    }
+                )
+            }
+
+            if (uiState.selectedDate != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                SelectedDateEventsSection(
+                    year = uiState.selectedYear,
+                    month = uiState.selectedMonth,
+                    day = uiState.selectedDate ?: 1,
+                    events = selectedDateEvents,
+                    onDeleteEvent = { showDeleteConfirmDialog = it }
+                )
+            }
         }
     }
 
-    if (uiState.showEventListDialog && uiState.selectedDate != null) {
-        ModernEventListDialog(
-            year = uiState.selectedYear,
-            month = uiState.selectedMonth,
-            day = uiState.selectedDate ?: 1,
-            events = selectedDateEvents,
-            onDismiss = { viewModel.onDismissEventListDialog() },
-            onDeleteEvent = { viewModel.deleteEvent(it) },
-            onAddEvent = {
-                viewModel.onAddEventClickFromDialog()
+    showDeleteConfirmDialog?.let { eventToDelete ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = null },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = {
+                Text(
+                    text = "确认删除",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text("确定要删除这条「${eventToDelete.eventType.name}」记录吗？")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteEvent(eventToDelete)
+                        showDeleteConfirmDialog = null
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("删除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = null }) {
+                    Text("取消")
+                }
             }
         )
     }
@@ -193,9 +303,6 @@ fun CalendarScreen(
             onAddEventType = { viewModel.onShowAddEventTypeDialog() },
             onConfirm = { eventTypeId, hour, minute, note ->
                 viewModel.addEventRecord(eventTypeId, hour, minute, note)
-            },
-            onConfirmNow = { eventTypeId, note ->
-                viewModel.addEventRecordNow(eventTypeId, note)
             }
         )
     }
@@ -216,8 +323,184 @@ fun CalendarScreen(
             onDismiss = { viewModel.onDismissMonthPickerDialog() },
             onConfirm = { year, month ->
                 viewModel.onMonthChange(year, month)
+                coroutineScope.launch {
+                    val targetCalendar = Calendar.getInstance().apply {
+                        set(Calendar.YEAR, year)
+                        set(Calendar.MONTH, month)
+                    }
+                    val currentCalendar = Calendar.getInstance()
+                    val monthsDiff = (targetCalendar.get(Calendar.YEAR) - currentCalendar.get(Calendar.YEAR)) * 12 +
+                            (targetCalendar.get(Calendar.MONTH) - currentCalendar.get(Calendar.MONTH))
+                    pagerState.scrollToPage(initialPage + monthsDiff)
+                }
             }
         )
+    }
+}
+
+@Composable
+fun SelectedDateEventsSection(
+    year: Int,
+    month: Int,
+    day: Int,
+    events: List<EventWithType>,
+    onDeleteEvent: (EventWithType) -> Unit
+) {
+    val dateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+    val dateString = "${month + 1}月${day}日"
+
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = dateString,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "${year}年",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+            Text(
+                text = "${events.size} 条记录",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (events.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Rounded.EventNote,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp),
+                        tint = TextSecondary.copy(alpha = 0.5f)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "暂无记录",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "点击右下角 + 添加记录",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.height(200.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(events) { eventWithType ->
+                    SelectedDateEventItem(
+                        eventWithType = eventWithType,
+                        timeString = dateFormat.format(eventWithType.record.timestamp),
+                        onDelete = { onDeleteEvent(eventWithType) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SelectedDateEventItem(
+    eventWithType: EventWithType,
+    timeString: String,
+    onDelete: () -> Unit
+) {
+    val eventColor = Color(eventWithType.eventType.color.toULong())
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = eventColor.copy(alpha = 0.1f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .background(eventColor, CircleShape)
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = eventWithType.eventType.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Rounded.Schedule,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = timeString,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+                if (eventWithType.record.note.isNotEmpty()) {
+                    Text(
+                        text = eventWithType.record.note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+            }
+
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.Rounded.Delete,
+                    contentDescription = "删除",
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
     }
 }
 
@@ -268,6 +551,12 @@ fun ModernCalendarGrid(
                 RoundedCornerShape(20.dp)
             )
             .padding(12.dp)
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            )
     ) {
         repeat(rows) { row ->
             Row(modifier = Modifier.fillMaxWidth()) {
@@ -364,201 +653,11 @@ fun isToday(year: Int, month: Int, day: Int): Boolean {
 }
 
 @Composable
-fun ModernEventListDialog(
-    year: Int,
-    month: Int,
-    day: Int,
-    events: List<EventWithType>,
-    onDismiss: () -> Unit,
-    onDeleteEvent: (EventWithType) -> Unit,
-    onAddEvent: () -> Unit
-) {
-    val dateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-    val dateString = "${month + 1}月${day}日"
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface
-        ) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = dateString,
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "${year}年",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary
-                        )
-                    }
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            Icons.Rounded.Close,
-                            contentDescription = "关闭",
-                            tint = TextSecondary
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                if (events.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                Icons.Rounded.EventNote,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = TextSecondary.copy(alpha = 0.5f)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "暂无记录",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = TextSecondary
-                            )
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.height(280.dp)
-                    ) {
-                        items(events) { eventWithType ->
-                            ModernEventItem(
-                                eventWithType = eventWithType,
-                                timeString = dateFormat.format(eventWithType.record.timestamp),
-                                onDelete = { onDeleteEvent(eventWithType) }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Button(
-                    onClick = onAddEvent,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Primary
-                    )
-                ) {
-                    Icon(
-                        Icons.Rounded.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("添加记录")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ModernEventItem(
-    eventWithType: EventWithType,
-    timeString: String,
-    onDelete: () -> Unit
-) {
-    val eventColor = Color(eventWithType.eventType.color.toULong())
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = eventColor.copy(alpha = 0.1f)
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(eventColor, CircleShape)
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = eventWithType.eventType.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Rounded.Schedule,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = TextSecondary
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = timeString,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
-                if (eventWithType.record.note.isNotEmpty()) {
-                    Text(
-                        text = eventWithType.record.note,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
-            }
-
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    Icons.Rounded.Delete,
-                    contentDescription = "删除",
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
 fun ModernAddEventDialog(
     eventTypes: List<EventType>,
     onDismiss: () -> Unit,
     onAddEventType: () -> Unit,
-    onConfirm: (Long, Int, Int, String) -> Unit,
-    onConfirmNow: (Long, String) -> Unit
+    onConfirm: (Long, Int, Int, String) -> Unit
 ) {
     var selectedEventTypeId by remember { mutableStateOf<Long?>(null) }
     var hour by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) }
@@ -832,26 +931,6 @@ fun ModernAddEventDialog(
                         Text("确定")
                     }
                 }
-
-                if (selectedEventTypeId != null) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    TextButton(
-                        onClick = {
-                            selectedEventTypeId?.let { id ->
-                                onConfirmNow(id, note)
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            Icons.Rounded.Schedule,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("记录为当前时间")
-                    }
-                }
             }
         }
     }
@@ -985,7 +1064,7 @@ fun MonthPickerDialog(
                     )
                     IconButton(onClick = onDismiss) {
                         Icon(
-                            Icons.Rounded.Close,
+                            Icons.Rounded.ChevronLeft,
                             contentDescription = "关闭",
                             tint = TextSecondary
                         )
@@ -1055,50 +1134,54 @@ fun MonthPickerDialog(
                     color = TextSecondary
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-                    columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(4),
-                    modifier = Modifier.height(180.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(12) { index ->
-                        val isSelected = selectedMonth == index
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(1f)
-                                .clickable { selectedMonth = index },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isSelected) {
-                                    Primary
-                                } else {
-                                    MaterialTheme.colorScheme.surfaceVariant
-                                }
-                            )
+                    listOf(0 to 3, 3 to 6, 6 to 9, 9 to 12).forEach { range ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = monthNames[index],
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) {
-                                        Color.White
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface
+                            for (index in range.first until range.second) {
+                                val isSelected = selectedMonth == index
+                                Card(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(44.dp)
+                                        .clickable { selectedMonth = index },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isSelected) {
+                                            Primary
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceVariant
+                                        }
+                                    )
+                                ) {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = monthNames[index],
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) {
+                                                Color.White
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface
+                                            }
+                                        )
                                     }
-                                )
+                                }
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

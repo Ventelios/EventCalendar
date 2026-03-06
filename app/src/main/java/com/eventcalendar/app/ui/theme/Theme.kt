@@ -12,83 +12,88 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-val Primary = Color(0xFF6366F1)
-val PrimaryLight = Color(0xFF818CF8)
-val PrimaryDark = Color(0xFF4F46E5)
-val Secondary = Color(0xFF10B981)
-val SecondaryLight = Color(0xFF34D399)
-val Accent = Color(0xFFF59E0B)
-val AccentLight = Color(0xFFFBBF24)
+val AccentOrange = Color(0xFFE07A3D)
+val AccentOrangeLight = Color(0xFFF5A66D)
+val AccentOrangeDark = Color(0xFFC45E22)
 
-val DarkBackground = Color(0xFF0A0A0B)
-val DarkSurface = Color(0xFF141416)
-val DarkSurfaceVariant = Color(0xFF1C1C1F)
-val DarkCard = Color(0xFF1F1F23)
-val DarkBorder = Color(0xFF2A2A2E)
+val WarmWhite = Color(0xFFFAF8F5)
+val WarmGray = Color(0xFFF5F2EE)
+val WarmGrayLight = Color(0xFFEDE9E3)
 
-val LightBackground = Color(0xFFFAFAFA)
-val LightSurface = Color(0xFFFFFFFF)
-val LightSurfaceVariant = Color(0xFFF5F5F7)
-val LightCard = Color(0xFFFFFFFF)
-val LightBorder = Color(0xFFE5E5E7)
+val WarmTextPrimary = Color(0xFF2D2A26)
+val WarmTextSecondary = Color(0xFF6B6560)
+val WarmTextTertiary = Color(0xFF9A948E)
 
-val TextPrimary = Color(0xFFF5F5F7)
-val TextSecondary = Color(0xFF9CA3AF)
-val TextPrimaryLight = Color(0xFF1F2937)
-val TextSecondaryLight = Color(0xFF6B7280)
+val DarkWarmBackground = Color(0xFF1A1714)
+val DarkWarmSurface = Color(0xFF242019)
+val DarkWarmSurfaceVariant = Color(0xFF2E2922)
+val DarkWarmCard = Color(0xFF38322A)
+
+val DarkTextPrimary = Color(0xFFF5F2EE)
+val DarkTextSecondary = Color(0xFFB5AFA8)
+val DarkTextTertiary = Color(0xFF7A756E)
+
+val WarmBorder = Color(0xFFE5E0D8)
+val DarkWarmBorder = Color(0xFF3D3830)
 
 val EventColors = listOf(
-    Color(0xFF6366F1),
-    Color(0xFF10B981),
-    Color(0xFFF59E0B),
-    Color(0xFFEF4444),
-    Color(0xFF8B5CF6),
-    Color(0xFFEC4899),
-    Color(0xFF06B6D4),
-    Color(0xFF84CC16)
+    Color(0xFFE07A3D),
+    Color(0xFF5B8C5A),
+    Color(0xFF6B8CAE),
+    Color(0xFFC4786B),
+    Color(0xFF8B7CB3),
+    Color(0xFFD4A259),
+    Color(0xFF6BAEAE),
+    Color(0xFFAE8B6B)
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Primary,
+    primary = AccentOrange,
     onPrimary = Color.White,
-    primaryContainer = PrimaryDark,
-    onPrimaryContainer = PrimaryLight,
-    secondary = Secondary,
+    primaryContainer = AccentOrangeDark,
+    onPrimaryContainer = AccentOrangeLight,
+    secondary = Color(0xFF6B8CAE),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFF1A3D31),
-    onSecondaryContainer = SecondaryLight,
-    tertiary = Accent,
+    secondaryContainer = Color(0xFF2A3A4A),
+    onSecondaryContainer = Color(0xFFB5C8D8),
+    tertiary = Color(0xFF5B8C5A),
     onTertiary = Color.White,
-    background = DarkBackground,
-    onBackground = TextPrimary,
-    surface = DarkSurface,
-    onSurface = TextPrimary,
-    surfaceVariant = DarkSurfaceVariant,
-    onSurfaceVariant = TextSecondary,
-    outline = DarkBorder,
-    outlineVariant = DarkCard,
+    background = DarkWarmBackground,
+    onBackground = DarkTextPrimary,
+    surface = DarkWarmSurface,
+    onSurface = DarkTextPrimary,
+    surfaceVariant = DarkWarmSurfaceVariant,
+    onSurfaceVariant = DarkTextSecondary,
+    outline = DarkWarmBorder,
+    outlineVariant = DarkWarmCard,
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Primary,
+    primary = AccentOrange,
     onPrimary = Color.White,
-    primaryContainer = PrimaryLight,
-    onPrimaryContainer = PrimaryDark,
-    secondary = Secondary,
+    primaryContainer = AccentOrangeLight,
+    onPrimaryContainer = AccentOrangeDark,
+    secondary = Color(0xFF6B8CAE),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFD1FAE5),
-    onSecondaryContainer = Secondary,
-    tertiary = Accent,
+    secondaryContainer = Color(0xFFE8EFF5),
+    onSecondaryContainer = Color(0xFF3A4A5A),
+    tertiary = Color(0xFF5B8C5A),
     onTertiary = Color.White,
-    background = LightBackground,
-    onBackground = TextPrimaryLight,
-    surface = LightSurface,
-    onSurface = TextPrimaryLight,
-    surfaceVariant = LightSurfaceVariant,
-    onSurfaceVariant = TextSecondaryLight,
-    outline = LightBorder,
-    outlineVariant = LightCard,
+    background = WarmWhite,
+    onBackground = WarmTextPrimary,
+    surface = WarmGray,
+    onSurface = WarmTextPrimary,
+    surfaceVariant = WarmGrayLight,
+    onSurfaceVariant = WarmTextSecondary,
+    outline = WarmBorder,
+    outlineVariant = Color.White,
 )
+
+val Primary = AccentOrange
+val PrimaryLight = AccentOrangeLight
+val PrimaryDark = AccentOrangeDark
+val TextSecondary = WarmTextSecondary
+val TextSecondaryLight = DarkTextSecondary
 
 @Composable
 fun EventCalendarTheme(
@@ -108,6 +113,8 @@ fun EventCalendarTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = Typography,
+        shapes = Shapes,
         content = content
     )
 }
