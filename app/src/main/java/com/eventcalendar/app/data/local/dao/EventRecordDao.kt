@@ -45,6 +45,12 @@ interface EventRecordDao {
 
     @Query("SELECT * FROM event_records WHERE timestamp >= :startTime AND timestamp < :endTime ORDER BY timestamp ASC")
     suspend fun getRecordsByTimeRange(startTime: Long, endTime: Long): List<EventRecord>
+
+    @Query("SELECT * FROM event_records ORDER BY timestamp DESC")
+    suspend fun getAllRecordsOnce(): List<EventRecord>
+
+    @Query("DELETE FROM event_records")
+    suspend fun deleteAll()
 }
 
 data class EventFrequencyRecord(

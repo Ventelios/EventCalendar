@@ -4,6 +4,7 @@ import com.eventcalendar.app.data.local.dao.EventRecordDao
 import com.eventcalendar.app.data.local.dao.EventTypeDao
 import com.eventcalendar.app.data.local.entity.EventRecord
 import com.eventcalendar.app.data.local.entity.EventType
+import com.eventcalendar.app.data.model.AppBackupData
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.mapLatest
@@ -137,4 +138,45 @@ class EventRepository @Inject constructor(
             }
         }
     }
+
+    suspend fun exportAllData(): AppBackupData {
+        val eventTypes = eventTypeDao.getAllEventTypesOnce()
+        val eventRecords = eventRecordDao.getAllRecordsOnce()
+        return AppBackupData(
+            eventTypes = eventTypes,
+            eventRecords = eventRecords
+        )
+    }
+
+    suspend fun importAllData(backupData: AppBackupData): ImportResult {
+        try {
+            eventTypeDao.deleteAll()
+            eventRecordDao.deleteAll()
+
+            val idMapping = mutableMapOf<Long, Long>()
+            
+            backupData.eventTypes.forEach { eventType ->
+                val oldId = eventType.id
+                val newId = eventTypeDao.insert(eventType.copy(id = 0))
+                idMapping[oldId] = newId
+            }
+
+            backupData.eventRecords.forEach { record ->
+                val newEventTypeId = idMapping[record.eventTypeId] ?: return ImportResult.Error("Invalid event type mapping")
+                eventRecordDao.insert(record.copy(id = 0, eventTypeId = newEventTypeId))
+            }
+
+            return ImportResult.Success(
+                eventTypesCount = backupData.eventTypes.size,
+                eventRecordsCount = backupData.eventRecords.size
+            )
+        } catch (e: Exception) {
+            return ImportResult.Error(e.message ?: "Unknown error")
+        }
+    }
+}
+
+sealed class ImportResult {
+    data class Success(val eventTypesCount: Int, val eventRecordsCount: Int) : ImportResult()
+    data class Error(val message: String) : ImportResult()
 }

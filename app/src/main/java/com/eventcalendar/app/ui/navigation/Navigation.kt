@@ -25,6 +25,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.eventcalendar.app.ui.screens.calendar.CalendarScreen
+import com.eventcalendar.app.ui.screens.datamanagement.DataManagementScreen
 import com.eventcalendar.app.ui.screens.eventtypes.EventTypesScreen
 import com.eventcalendar.app.ui.screens.history.HistoryScreen
 import com.eventcalendar.app.ui.screens.menu.AboutAuthorScreen
@@ -116,6 +117,9 @@ fun EventCalendarNavHost() {
             }
             composable("about_author") {
                 AboutAuthorScreen(navController = navController)
+            }
+            composable("data_management") {
+                DataManagementScreen(navController = navController)
             }
         }
     }

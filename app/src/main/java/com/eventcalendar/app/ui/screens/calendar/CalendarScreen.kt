@@ -22,9 +22,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronLeft
@@ -225,37 +222,43 @@ fun CalendarScreen(
 
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
                 verticalAlignment = Alignment.Top
             ) { page ->
                 val pageOffset = page - initialPage
-                val calendar = Calendar.getInstance().apply {
+                val pageCalendar = Calendar.getInstance().apply {
                     add(Calendar.MONTH, pageOffset)
                 }
-                val year = calendar.get(Calendar.YEAR)
-                val month = calendar.get(Calendar.MONTH)
+                val year = pageCalendar.get(Calendar.YEAR)
+                val month = pageCalendar.get(Calendar.MONTH)
 
-                ModernCalendarGrid(
-                    year = year,
-                    month = month,
-                    datesWithEvents = if (year == uiState.currentYear && month == uiState.currentMonth) datesWithEvents else emptySet(),
-                    selectedDate = if (year == uiState.currentYear && month == uiState.currentMonth) uiState.selectedDate else null,
-                    onDateClick = { day ->
-                        viewModel.onDateSelected(year, month, day)
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    ModernCalendarGrid(
+                        year = year,
+                        month = month,
+                        datesWithEvents = if (year == uiState.currentYear && month == uiState.currentMonth) datesWithEvents else emptySet(),
+                        selectedDate = if (year == uiState.currentYear && month == uiState.currentMonth) uiState.selectedDate else null,
+                        onDateClick = { day ->
+                            viewModel.onDateSelected(year, month, day)
+                        }
+                    )
+
+                    if (year == uiState.currentYear && month == uiState.currentMonth && uiState.selectedDate != null) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        SelectedDateEventsSection(
+                            year = uiState.selectedYear,
+                            month = uiState.selectedMonth,
+                            day = uiState.selectedDate ?: 1,
+                            events = selectedDateEvents,
+                            onDeleteEvent = { showDeleteConfirmDialog = it }
+                        )
                     }
-                )
-            }
-
-            if (uiState.selectedDate != null) {
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                SelectedDateEventsSection(
-                    year = uiState.selectedYear,
-                    month = uiState.selectedMonth,
-                    day = uiState.selectedDate ?: 1,
-                    events = selectedDateEvents,
-                    onDeleteEvent = { showDeleteConfirmDialog = it }
-                )
+                }
             }
         }
     }
@@ -506,7 +509,7 @@ fun SelectedDateEventItem(
 
 @Composable
 fun ModernWeekDayHeader() {
-    val weekDays = listOf("日", "一", "二", "三", "四", "五", "六")
+    val weekDays = listOf("一", "二", "三", "四", "五", "六", "日")
 
     Row(modifier = Modifier.fillMaxWidth()) {
         weekDays.forEachIndexed { index, day ->
@@ -516,7 +519,7 @@ fun ModernWeekDayHeader() {
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Medium,
-                color = if (index == 0 || index == 6) {
+                color = if (index == 5 || index == 6) {
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
                 } else {
                     TextSecondary
@@ -538,7 +541,12 @@ fun ModernCalendarGrid(
         set(year, month, 1)
     }
     val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
-    val firstDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK) - 1
+    
+    val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+    val firstDayOfWeek = when (dayOfWeek) {
+        Calendar.SUNDAY -> 6
+        else -> dayOfWeek - 2
+    }
 
     val totalCells = firstDayOfWeek + daysInMonth
     val rows = (totalCells + 6) / 7
@@ -546,29 +554,25 @@ fun ModernCalendarGrid(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .height(280.dp)
             .background(
                 MaterialTheme.colorScheme.surface,
                 RoundedCornerShape(20.dp)
             )
-            .padding(12.dp)
-            .animateContentSize(
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
-                )
-            )
+            .padding(12.dp),
+        verticalArrangement = Arrangement.SpaceEvenly
     ) {
         repeat(rows) { row ->
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
                 repeat(7) { col ->
                     val cellIndex = row * 7 + col
                     val day = cellIndex - firstDayOfWeek + 1
 
                     Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .aspectRatio(1f)
-                            .padding(2.dp),
+                        modifier = Modifier.size(40.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         if (day in 1..daysInMonth) {

@@ -34,4 +34,7 @@ interface EventTypeDao {
 
     @Query("SELECT COUNT(*) FROM event_types")
     fun getCount(): Flow<Int>
+
+    @Query("DELETE FROM event_types")
+    suspend fun deleteAll()
 }
