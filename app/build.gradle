@@ -10,12 +10,18 @@ android {
     namespace 'com.eventcalendar.app'
     compileSdk 36
 
+    def keyPropertiesFile = rootProject.file("key.properties")
+    def keyProperties = new Properties()
+    if (keyPropertiesFile.exists()) {
+        keyProperties.load(new FileInputStream(keyPropertiesFile))
+    }
+
     defaultConfig {
         applicationId "com.eventcalendar.app"
         minSdk 26
         targetSdk 36
-        versionCode 4
-        versionName "1.2"
+        versionCode 5
+        versionName "1.2.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -23,10 +29,22 @@ android {
         }
     }
 
+    signingConfigs {
+        release {
+            if (keyPropertiesFile.exists()) {
+                storeFile file(keyProperties['storeFile'])
+                storePassword keyProperties['storePassword']
+                keyAlias keyProperties['keyAlias']
+                keyPassword keyProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
     compileOptions {

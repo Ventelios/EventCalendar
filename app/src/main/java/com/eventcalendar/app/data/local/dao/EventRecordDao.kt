@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import com.eventcalendar.app.data.local.entity.EventRecord
 import kotlinx.coroutines.flow.Flow
 
@@ -12,6 +13,9 @@ import kotlinx.coroutines.flow.Flow
 interface EventRecordDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(record: EventRecord): Long
+
+    @Update
+    suspend fun update(record: EventRecord)
 
     @Delete
     suspend fun delete(record: EventRecord)

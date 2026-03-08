@@ -27,6 +27,8 @@ data class CalendarUiState(
     val showAddEventDialog: Boolean = false,
     val showAddEventTypeDialog: Boolean = false,
     val showMonthPickerDialog: Boolean = false,
+    val showEditEventDialog: Boolean = false,
+    val editingEvent: EventWithType? = null,
     val addEventYear: Int = Calendar.getInstance().get(Calendar.YEAR),
     val addEventMonth: Int = Calendar.getInstance().get(Calendar.MONTH),
     val addEventDay: Int = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
@@ -216,6 +218,50 @@ class CalendarViewModel @Inject constructor(
         viewModelScope.launch {
             repository.deleteEventRecord(event.record)
             val state = _uiState.value
+            if (state.selectedDate != null) {
+                loadEventsForSelectedDate(state.selectedYear, state.selectedMonth, state.selectedDate)
+            }
+            loadDatesWithEvents()
+        }
+    }
+
+    fun onEditEventClick(event: EventWithType) {
+        _uiState.value = _uiState.value.copy(
+            showEditEventDialog = true,
+            editingEvent = event
+        )
+    }
+
+    fun onDismissEditEventDialog() {
+        _uiState.value = _uiState.value.copy(
+            showEditEventDialog = false,
+            editingEvent = null
+        )
+    }
+
+    fun updateEventRecord(eventTypeId: Long, hour: Int, minute: Int, note: String) {
+        val state = _uiState.value
+        val editingEvent = state.editingEvent ?: return
+
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = editingEvent.record.timestamp
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        viewModelScope.launch {
+            val updatedRecord = editingEvent.record.copy(
+                eventTypeId = eventTypeId,
+                timestamp = calendar.timeInMillis,
+                note = note
+            )
+            repository.updateEventRecord(updatedRecord)
+            _uiState.value = _uiState.value.copy(
+                showEditEventDialog = false,
+                editingEvent = null
+            )
             if (state.selectedDate != null) {
                 loadEventsForSelectedDate(state.selectedYear, state.selectedMonth, state.selectedDate)
             }

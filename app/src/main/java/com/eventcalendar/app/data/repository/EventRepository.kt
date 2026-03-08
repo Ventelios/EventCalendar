@@ -56,6 +56,10 @@ class EventRepository @Inject constructor(
         return eventRecordDao.insert(record)
     }
 
+    suspend fun updateEventRecord(record: EventRecord) {
+        eventRecordDao.update(record)
+    }
+
     suspend fun deleteEventRecord(record: EventRecord) {
         eventRecordDao.delete(record)
     }

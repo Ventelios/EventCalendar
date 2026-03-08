@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EventNote
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Schedule
@@ -255,6 +256,7 @@ fun CalendarScreen(
                             month = uiState.selectedMonth,
                             day = uiState.selectedDate ?: 1,
                             events = selectedDateEvents,
+                            onEditEvent = { viewModel.onEditEventClick(it) },
                             onDeleteEvent = { showDeleteConfirmDialog = it }
                         )
                     }
@@ -319,6 +321,25 @@ fun CalendarScreen(
         )
     }
 
+    if (uiState.showEditEventDialog && uiState.editingEvent != null) {
+        uiState.editingEvent?.let { editingEvent ->
+            val calendar = Calendar.getInstance().apply {
+                timeInMillis = editingEvent.record.timestamp
+            }
+            EditEventDialog(
+                eventTypes = uiState.eventTypes,
+                eventTypeId = editingEvent.eventType.id,
+                hour = calendar.get(Calendar.HOUR_OF_DAY),
+                minute = calendar.get(Calendar.MINUTE),
+                note = editingEvent.record.note,
+                onDismiss = { viewModel.onDismissEditEventDialog() },
+                onConfirm = { eventTypeId, hour, minute, note ->
+                    viewModel.updateEventRecord(eventTypeId, hour, minute, note)
+                }
+            )
+        }
+    }
+
     if (uiState.showMonthPickerDialog) {
         MonthPickerDialog(
             currentYear = uiState.currentYear,
@@ -347,6 +368,7 @@ fun SelectedDateEventsSection(
     month: Int,
     day: Int,
     events: List<EventWithType>,
+    onEditEvent: (EventWithType) -> Unit,
     onDeleteEvent: (EventWithType) -> Unit
 ) {
     val dateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
@@ -425,6 +447,7 @@ fun SelectedDateEventsSection(
                     SelectedDateEventItem(
                         eventWithType = eventWithType,
                         timeString = dateFormat.format(eventWithType.record.timestamp),
+                        onEdit = { onEditEvent(eventWithType) },
                         onDelete = { onDeleteEvent(eventWithType) }
                     )
                 }
@@ -437,6 +460,7 @@ fun SelectedDateEventsSection(
 fun SelectedDateEventItem(
     eventWithType: EventWithType,
     timeString: String,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val eventColor = Color(eventWithType.eventType.color.toULong())
@@ -492,16 +516,31 @@ fun SelectedDateEventItem(
                 }
             }
 
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.size(32.dp)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                Icon(
-                    Icons.Rounded.Delete,
-                    contentDescription = "删除",
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                    modifier = Modifier.size(18.dp)
-                )
+                IconButton(
+                    onClick = onEdit,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.Edit,
+                        contentDescription = "编辑",
+                        tint = Primary.copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.Delete,
+                        contentDescription = "删除",
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }
@@ -774,6 +813,22 @@ fun ModernAddEventDialog(
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
+                        onClick = onAddEventType,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("新建事件类型")
+                    }
                 }
 
                 if (eventTypes.isNotEmpty()) {
@@ -933,6 +988,252 @@ fun ModernAddEventDialog(
                         )
                     ) {
                         Text("确定")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EditEventDialog(
+    eventTypes: List<EventType>,
+    eventTypeId: Long,
+    hour: Int,
+    minute: Int,
+    note: String,
+    onDismiss: () -> Unit,
+    onConfirm: (Long, Int, Int, String) -> Unit
+) {
+    var selectedEventTypeId by remember { mutableStateOf(eventTypeId) }
+    var selectedHour by remember { mutableIntStateOf(hour) }
+    var selectedMinute by remember { mutableIntStateOf(minute) }
+    var selectedNote by remember { mutableStateOf(note) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = "编辑事件",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = "选择事件类型",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                LazyColumn(
+                    modifier = Modifier.height(200.dp)
+                ) {
+                    items(eventTypes) { eventType ->
+                        val isSelected = selectedEventTypeId == eventType.id
+                        val eventColor = Color(eventType.color.toULong())
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clickable { selectedEventTypeId = eventType.id },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) {
+                                    eventColor.copy(alpha = 0.2f)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                }
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .background(eventColor, CircleShape)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = eventType.name,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = "时间",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "时",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { if (selectedHour > 0) selectedHour-- },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        CircleShape
+                                    )
+                            ) {
+                                Icon(
+                                    Icons.Rounded.ChevronLeft,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Text(
+                                text = selectedHour.toString().padStart(2, '0'),
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 12.dp)
+                            )
+                            IconButton(
+                                onClick = { if (selectedHour < 23) selectedHour++ },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        CircleShape
+                                    )
+                            ) {
+                                Icon(
+                                    Icons.Rounded.ChevronRight,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "分",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { if (selectedMinute > 0) selectedMinute-- else selectedMinute = 59 },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        CircleShape
+                                    )
+                            ) {
+                                Icon(
+                                    Icons.Rounded.ChevronLeft,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Text(
+                                text = selectedMinute.toString().padStart(2, '0'),
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 12.dp)
+                            )
+                            IconButton(
+                                onClick = { if (selectedMinute < 59) selectedMinute++ else selectedMinute = 0 },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        CircleShape
+                                    )
+                            ) {
+                                Icon(
+                                    Icons.Rounded.ChevronRight,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = selectedNote,
+                    onValueChange = { selectedNote = it },
+                    label = { Text("备注 (可选)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                    ),
+                    maxLines = 2
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("取消")
+                    }
+
+                    Button(
+                        onClick = {
+                            onConfirm(selectedEventTypeId, selectedHour, selectedMinute, selectedNote)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Primary
+                        )
+                    ) {
+                        Text("保存")
                     }
                 }
             }
