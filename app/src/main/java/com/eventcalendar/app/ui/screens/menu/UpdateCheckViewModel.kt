@@ -19,7 +19,10 @@ data class UpdateCheckUiState(
     val currentReleaseInfo: ReleaseInfo? = null,
     val isLoadingCurrentRelease: Boolean = false,
     val updateResult: UpdateCheckResult? = null,
-    val lastCheckTime: Long? = null
+    val lastCheckTime: Long? = null,
+    val githubLatency: Long? = null,
+    val giteeLatency: Long? = null,
+    val isMeasuringLatency: Boolean = false
 )
 
 @HiltViewModel
@@ -58,6 +61,24 @@ class UpdateCheckViewModel @Inject constructor(
                 isChecking = false,
                 updateResult = result,
                 lastCheckTime = System.currentTimeMillis()
+            )
+        }
+    }
+
+    fun measureNetworkLatency() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isMeasuringLatency = true,
+                githubLatency = null,
+                giteeLatency = null
+            )
+            
+            val (githubStatus, giteeStatus) = releaseService.measureNetworkLatency()
+            
+            _uiState.value = _uiState.value.copy(
+                isMeasuringLatency = false,
+                githubLatency = githubStatus.latency,
+                giteeLatency = giteeStatus.latency
             )
         }
     }

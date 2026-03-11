@@ -1057,6 +1057,7 @@ fun EditEventDialog(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WheelTimePicker(
     selectedHour: Int,
@@ -1067,36 +1068,25 @@ fun WheelTimePicker(
     val hours = (0..23).toList()
     val minutes = (0..59).toList()
     
-    val hourListState = rememberLazyListState(initialFirstVisibleItemIndex = selectedHour)
-    val minuteListState = rememberLazyListState(initialFirstVisibleItemIndex = selectedMinute)
+    val hourListState = rememberLazyListState()
+    val minuteListState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    
+    var hourInitialized by remember { mutableStateOf(false) }
+    var minuteInitialized by remember { mutableStateOf(false) }
     
     LaunchedEffect(Unit) {
-        hourListState.scrollToItem(selectedHour)
+        coroutineScope.launch {
+            hourListState.scrollToItem(selectedHour)
+            hourInitialized = true
+        }
     }
+    
     LaunchedEffect(Unit) {
-        minuteListState.scrollToItem(selectedMinute)
-    }
-    
-    LaunchedEffect(hourListState) {
-        snapshotFlow { hourListState.firstVisibleItemIndex }
-            .collect { index ->
-                if (!hourListState.isScrollInProgress) {
-                    if (index in hours.indices && index != selectedHour) {
-                        onHourChanged(index)
-                    }
-                }
-            }
-    }
-    
-    LaunchedEffect(minuteListState) {
-        snapshotFlow { minuteListState.firstVisibleItemIndex }
-            .collect { index ->
-                if (!minuteListState.isScrollInProgress) {
-                    if (index in minutes.indices && index != selectedMinute) {
-                        onMinuteChanged(index)
-                    }
-                }
-            }
+        coroutineScope.launch {
+            minuteListState.scrollToItem(selectedMinute)
+            minuteInitialized = true
+        }
     }
     
     Row(
@@ -1114,7 +1104,11 @@ fun WheelTimePicker(
             WheelPicker(
                 items = hours.map { it.toString().padStart(2, '0') },
                 listState = hourListState,
-                onSelectedChanged = { onHourChanged(it) }
+                onSelectedChanged = { 
+                    if (hourInitialized) {
+                        onHourChanged(it) 
+                    }
+                }
             )
         }
         
@@ -1139,12 +1133,17 @@ fun WheelTimePicker(
             WheelPicker(
                 items = minutes.map { it.toString().padStart(2, '0') },
                 listState = minuteListState,
-                onSelectedChanged = { onMinuteChanged(it) }
+                onSelectedChanged = { 
+                    if (minuteInitialized) {
+                        onMinuteChanged(it) 
+                    }
+                }
             )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WheelPicker(
     items: List<String>,
@@ -1152,6 +1151,8 @@ fun WheelPicker(
     onSelectedChanged: (Int) -> Unit
 ) {
     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
+    
+    var lastNotifiedIndex by remember { mutableIntStateOf(-1) }
     
     val visibleCenterIndex by remember {
         derivedStateOf {
@@ -1167,6 +1168,15 @@ fun WheelPicker(
             }
             
             centerItem?.index ?: 0
+        }
+    }
+    
+    LaunchedEffect(listState.isScrollInProgress, visibleCenterIndex) {
+        if (!listState.isScrollInProgress && visibleCenterIndex in items.indices) {
+            if (lastNotifiedIndex != visibleCenterIndex) {
+                lastNotifiedIndex = visibleCenterIndex
+                onSelectedChanged(visibleCenterIndex)
+            }
         }
     }
     

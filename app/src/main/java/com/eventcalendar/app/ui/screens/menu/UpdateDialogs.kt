@@ -2,11 +2,14 @@ package com.eventcalendar.app.ui.screens.menu
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -14,9 +17,15 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -24,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.eventcalendar.app.data.service.UpdateCheckResult
 import com.eventcalendar.app.ui.theme.Primary
+import com.eventcalendar.app.ui.theme.TextSecondary
 
 @Composable
 fun UpdateDialog(
@@ -31,6 +41,19 @@ fun UpdateDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    var showSourceDialog by remember { mutableStateOf(false) }
+    
+    if (showSourceDialog) {
+        DownloadSourceDialog(
+            githubUrl = updateResult.githubDownloadUrl,
+            giteeUrl = updateResult.giteeDownloadUrl,
+            onDismiss = { showSourceDialog = false },
+            onDownload = { url ->
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                context.startActivity(intent)
+            }
+        )
+    }
     
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -76,10 +99,7 @@ fun UpdateDialog(
         },
         confirmButton = {
             Button(
-                onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateResult.downloadUrl))
-                    context.startActivity(intent)
-                },
+                onClick = { showSourceDialog = true },
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Primary)
             ) {
@@ -89,6 +109,112 @@ fun UpdateDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("稍后提醒")
+            }
+        }
+    )
+}
+
+@Composable
+private fun DownloadSourceDialog(
+    githubUrl: String?,
+    giteeUrl: String?,
+    onDismiss: () -> Unit,
+    onDownload: (String) -> Unit
+) {
+    var selectedSource by remember { mutableStateOf(if (githubUrl != null) "github" else "gitee") }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(20.dp),
+        title = {
+            Text(
+                text = "选择下载源",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "请选择下载更新的服务器：",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                if (githubUrl != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selectedSource == "github",
+                            onClick = { selectedSource = "github" }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "GitHub",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "国际线路，推荐海外用户使用",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+                
+                if (giteeUrl != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selectedSource == "gitee",
+                            onClick = { selectedSource = "gitee" }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "Gitee",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "国内线路，推荐国内用户使用",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val url = when (selectedSource) {
+                        "github" -> githubUrl ?: giteeUrl
+                        else -> giteeUrl ?: githubUrl
+                    }
+                    url?.let { onDownload(it) }
+                },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Primary)
+            ) {
+                Text("开始下载")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
             }
         }
     )

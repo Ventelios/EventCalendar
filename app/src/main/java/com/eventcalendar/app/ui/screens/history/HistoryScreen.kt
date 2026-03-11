@@ -1,7 +1,9 @@
 package com.eventcalendar.app.ui.screens.history
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,13 +17,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ChevronLeft
-import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.History
@@ -46,12 +48,16 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -64,6 +70,7 @@ import com.eventcalendar.app.data.local.entity.EventType
 import com.eventcalendar.app.data.repository.EventWithType
 import com.eventcalendar.app.ui.theme.Primary
 import com.eventcalendar.app.ui.theme.TextSecondary
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -456,107 +463,12 @@ fun EditEventDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "时",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextSecondary
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = { if (selectedHour > 0) selectedHour-- },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.surfaceVariant,
-                                        CircleShape
-                                    )
-                            ) {
-                                Icon(
-                                    Icons.Rounded.ChevronLeft,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Text(
-                                text = selectedHour.toString().padStart(2, '0'),
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 12.dp)
-                            )
-                            IconButton(
-                                onClick = { if (selectedHour < 23) selectedHour++ },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.surfaceVariant,
-                                        CircleShape
-                                    )
-                            ) {
-                                Icon(
-                                    Icons.Rounded.ChevronRight,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "分",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextSecondary
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = { if (selectedMinute > 0) selectedMinute-- else selectedMinute = 59 },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.surfaceVariant,
-                                        CircleShape
-                                    )
-                            ) {
-                                Icon(
-                                    Icons.Rounded.ChevronLeft,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Text(
-                                text = selectedMinute.toString().padStart(2, '0'),
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 12.dp)
-                            )
-                            IconButton(
-                                onClick = { if (selectedMinute < 59) selectedMinute++ else selectedMinute = 0 },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.surfaceVariant,
-                                        CircleShape
-                                    )
-                            ) {
-                                Icon(
-                                    Icons.Rounded.ChevronRight,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
-                }
+                WheelTimePicker(
+                    selectedHour = selectedHour,
+                    selectedMinute = selectedMinute,
+                    onHourChanged = { selectedHour = it },
+                    onMinuteChanged = { selectedMinute = it }
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -598,6 +510,187 @@ fun EditEventDialog(
                         )
                     ) {
                         Text("保存")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun WheelTimePicker(
+    selectedHour: Int,
+    selectedMinute: Int,
+    onHourChanged: (Int) -> Unit,
+    onMinuteChanged: (Int) -> Unit
+) {
+    val hours = (0..23).toList()
+    val minutes = (0..59).toList()
+    
+    val hourListState = rememberLazyListState()
+    val minuteListState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    
+    var hourInitialized by remember { mutableStateOf(false) }
+    var minuteInitialized by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(Unit) {
+        coroutineScope.launch {
+            hourListState.scrollToItem(selectedHour)
+            hourInitialized = true
+        }
+    }
+    
+    LaunchedEffect(Unit) {
+        coroutineScope.launch {
+            minuteListState.scrollToItem(selectedMinute)
+            minuteInitialized = true
+        }
+    }
+    
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "时",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextSecondary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            WheelPicker(
+                items = hours.map { it.toString().padStart(2, '0') },
+                listState = hourListState,
+                onSelectedChanged = { 
+                    if (hourInitialized) {
+                        onHourChanged(it) 
+                    }
+                }
+            )
+        }
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        Text(
+            text = ":",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "分",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextSecondary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            WheelPicker(
+                items = minutes.map { it.toString().padStart(2, '0') },
+                listState = minuteListState,
+                onSelectedChanged = { 
+                    if (minuteInitialized) {
+                        onMinuteChanged(it) 
+                    }
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun WheelPicker(
+    items: List<String>,
+    listState: LazyListState,
+    onSelectedChanged: (Int) -> Unit
+) {
+    val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
+    
+    var lastNotifiedIndex by remember { mutableIntStateOf(-1) }
+    
+    val visibleCenterIndex by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            if (layoutInfo.totalItemsCount == 0) return@derivedStateOf 0
+            
+            val viewportCenter = layoutInfo.viewportStartOffset + 
+                (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset) / 2
+            
+            val centerItem = layoutInfo.visibleItemsInfo.minByOrNull { item ->
+                val itemCenter = item.offset + item.size / 2
+                kotlin.math.abs(itemCenter - viewportCenter)
+            }
+            
+            centerItem?.index ?: 0
+        }
+    }
+    
+    LaunchedEffect(listState.isScrollInProgress, visibleCenterIndex) {
+        if (!listState.isScrollInProgress && visibleCenterIndex in items.indices) {
+            if (lastNotifiedIndex != visibleCenterIndex) {
+                lastNotifiedIndex = visibleCenterIndex
+                onSelectedChanged(visibleCenterIndex)
+            }
+        }
+    }
+    
+    val itemHeight = 36.dp
+    
+    Box(
+        modifier = Modifier
+            .width(80.dp)
+            .height(180.dp)
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                RoundedCornerShape(16.dp)
+            )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(itemHeight)
+                .align(Alignment.Center)
+                .background(
+                    Primary.copy(alpha = 0.15f),
+                    RoundedCornerShape(8.dp)
+                )
+        )
+        
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            flingBehavior = flingBehavior,
+            contentPadding = PaddingValues(vertical = 72.dp)
+        ) {
+            items.forEachIndexed { index, item ->
+                item {
+                    val isSelected = index == visibleCenterIndex
+                    Box(
+                        modifier = Modifier
+                            .height(itemHeight)
+                            .fillMaxWidth()
+                            .clickable { 
+                                onSelectedChanged(index)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = item,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                TextSecondary.copy(alpha = 0.5f)
+                            }
+                        )
                     }
                 }
             }

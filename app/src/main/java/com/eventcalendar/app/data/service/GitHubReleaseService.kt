@@ -42,7 +42,8 @@ sealed class UpdateCheckResult {
     data class UpdateAvailable(
         val latestVersion: String,
         val releaseNotes: String,
-        val downloadUrl: String,
+        val githubDownloadUrl: String?,
+        val giteeDownloadUrl: String?,
         val publishedAt: String
     ) : UpdateCheckResult()
     
@@ -51,10 +52,16 @@ sealed class UpdateCheckResult {
     data class Error(val message: String) : UpdateCheckResult()
 }
 
+data class NetworkStatus(
+    val available: Boolean,
+    val latency: Long?
+)
+
 data class ReleaseInfo(
     val version: String,
     val releaseNotes: String,
-    val downloadUrl: String,
+    val githubDownloadUrl: String?,
+    val giteeDownloadUrl: String?,
     val publishedAt: String
 )
 
@@ -71,11 +78,34 @@ class GitHubReleaseService(
     
     private val gson = Gson()
     
+    private val githubApkUrlCache = mutableMapOf<String, String>()
+    private val giteeApkUrlCache = mutableMapOf<String, String>()
+    
     suspend fun getReleaseByVersion(version: String): ReleaseInfo? = withContext(Dispatchers.IO) {
-        getGitHubReleaseByVersion(version) ?: getGiteeReleaseByVersion(version)
+        val githubInfo = getGitHubReleaseByVersion(version)
+        val giteeInfo = getGiteeReleaseByVersion(version)
+        
+        if (githubInfo != null || giteeInfo != null) {
+            ReleaseInfo(
+                version = githubInfo?.version ?: giteeInfo?.version ?: version,
+                releaseNotes = githubInfo?.releaseNotes ?: giteeInfo?.releaseNotes ?: "",
+                githubDownloadUrl = githubInfo?.downloadUrl,
+                giteeDownloadUrl = giteeInfo?.downloadUrl,
+                publishedAt = githubInfo?.publishedAt ?: giteeInfo?.publishedAt ?: ""
+            )
+        } else {
+            null
+        }
     }
     
-    private suspend fun getGitHubReleaseByVersion(version: String): ReleaseInfo? = withContext(Dispatchers.IO) {
+    private data class ReleaseInfoInternal(
+        val version: String,
+        val releaseNotes: String,
+        val downloadUrl: String?,
+        val publishedAt: String
+    )
+    
+    private suspend fun getGitHubReleaseByVersion(version: String): ReleaseInfoInternal? = withContext(Dispatchers.IO) {
         try {
             val url = "https://api.github.com/repos/$githubOwner/$githubRepo/releases/tags/v$version"
             val request = Request.Builder()
@@ -96,10 +126,15 @@ class GitHubReleaseService(
                 it.name.endsWith(".apk", ignoreCase = true) 
             }
             
-            ReleaseInfo(
+            val downloadUrl = apkAsset?.downloadUrl ?: release.htmlUrl
+            if (apkAsset != null) {
+                githubApkUrlCache[version] = downloadUrl
+            }
+            
+            ReleaseInfoInternal(
                 version = release.tagName.removePrefix("v"),
                 releaseNotes = release.body,
-                downloadUrl = apkAsset?.downloadUrl ?: release.htmlUrl,
+                downloadUrl = downloadUrl,
                 publishedAt = release.publishedAt
             )
         } catch (e: Exception) {
@@ -107,7 +142,7 @@ class GitHubReleaseService(
         }
     }
     
-    private suspend fun getGiteeReleaseByVersion(version: String): ReleaseInfo? = withContext(Dispatchers.IO) {
+    private suspend fun getGiteeReleaseByVersion(version: String): ReleaseInfoInternal? = withContext(Dispatchers.IO) {
         try {
             val url = "https://gitee.com/api/v5/repos/$giteeOwner/$giteeRepo/releases/tags/v$version"
             val request = Request.Builder().url(url).build()
@@ -125,10 +160,15 @@ class GitHubReleaseService(
                 it.name.endsWith(".apk", ignoreCase = true) 
             }
             
-            ReleaseInfo(
+            val downloadUrl = apkAsset?.downloadUrl ?: release.htmlUrl
+            if (apkAsset != null) {
+                giteeApkUrlCache[version] = downloadUrl
+            }
+            
+            ReleaseInfoInternal(
                 version = release.tagName.removePrefix("v"),
                 releaseNotes = release.body,
-                downloadUrl = apkAsset?.downloadUrl ?: release.htmlUrl,
+                downloadUrl = downloadUrl,
                 publishedAt = release.createdAt
             )
         } catch (e: Exception) {
@@ -137,8 +177,85 @@ class GitHubReleaseService(
     }
     
     suspend fun checkForUpdate(currentVersion: String): UpdateCheckResult = withContext(Dispatchers.IO) {
-        checkGitHubForUpdate(currentVersion) ?: checkGiteeForUpdate(currentVersion) 
-            ?: UpdateCheckResult.Error("无法获取版本信息，请检查网络连接")
+        checkForUpdateWithStatus(currentVersion).first
+    }
+    
+    suspend fun checkForUpdateWithStatus(currentVersion: String): Triple<UpdateCheckResult, Boolean?, Boolean?> = withContext(Dispatchers.IO) {
+        val githubResult = checkGitHubForUpdate(currentVersion)
+        val giteeResult = checkGiteeForUpdate(currentVersion)
+        
+        val githubAvailable = githubResult != null
+        val giteeAvailable = giteeResult != null
+        
+        val result = when {
+            githubResult is UpdateCheckResult.UpdateAvailable || giteeResult is UpdateCheckResult.UpdateAvailable -> {
+                val githubUpdate = githubResult as? UpdateCheckResult.UpdateAvailable
+                val giteeUpdate = giteeResult as? UpdateCheckResult.UpdateAvailable
+                
+                UpdateCheckResult.UpdateAvailable(
+                    latestVersion = githubUpdate?.latestVersion ?: giteeUpdate?.latestVersion ?: "",
+                    releaseNotes = githubUpdate?.releaseNotes ?: giteeUpdate?.releaseNotes ?: "",
+                    githubDownloadUrl = githubUpdate?.githubDownloadUrl,
+                    giteeDownloadUrl = giteeUpdate?.giteeDownloadUrl,
+                    publishedAt = githubUpdate?.publishedAt ?: giteeUpdate?.publishedAt ?: ""
+                )
+            }
+            githubResult is UpdateCheckResult.NoUpdate || giteeResult is UpdateCheckResult.NoUpdate -> {
+                UpdateCheckResult.NoUpdate
+            }
+            else -> UpdateCheckResult.Error("无法获取版本信息，请检查网络连接")
+        }
+        
+        Triple(result, githubAvailable, giteeAvailable)
+    }
+    
+    suspend fun measureNetworkLatency(): Pair<NetworkStatus, NetworkStatus> = withContext(Dispatchers.IO) {
+        val githubStatus = measureGithubLatency()
+        val giteeStatus = measureGiteeLatency()
+        Pair(githubStatus, giteeStatus)
+    }
+    
+    private fun measureGithubLatency(): NetworkStatus {
+        return try {
+            val startTime = System.currentTimeMillis()
+            val url = "https://api.github.com/repos/$githubOwner/$githubRepo/releases/latest"
+            val request = Request.Builder()
+                .url(url)
+                .header("Accept", "application/vnd.github.v3+json")
+                .head()
+                .build()
+            
+            val response = client.newCall(request).execute()
+            val latency = System.currentTimeMillis() - startTime
+            
+            NetworkStatus(
+                available = response.isSuccessful,
+                latency = if (response.isSuccessful) latency else null
+            )
+        } catch (e: Exception) {
+            NetworkStatus(available = false, latency = null)
+        }
+    }
+    
+    private fun measureGiteeLatency(): NetworkStatus {
+        return try {
+            val startTime = System.currentTimeMillis()
+            val url = "https://gitee.com/api/v5/repos/$giteeOwner/$giteeRepo/releases/latest"
+            val request = Request.Builder()
+                .url(url)
+                .head()
+                .build()
+            
+            val response = client.newCall(request).execute()
+            val latency = System.currentTimeMillis() - startTime
+            
+            NetworkStatus(
+                available = response.isSuccessful,
+                latency = if (response.isSuccessful) latency else null
+            )
+        } catch (e: Exception) {
+            NetworkStatus(available = false, latency = null)
+        }
     }
     
     private suspend fun checkGitHubForUpdate(currentVersion: String): UpdateCheckResult? = withContext(Dispatchers.IO) {
@@ -168,7 +285,8 @@ class GitHubReleaseService(
                 UpdateCheckResult.UpdateAvailable(
                     latestVersion = latestVersion,
                     releaseNotes = release.body,
-                    downloadUrl = apkAsset?.downloadUrl ?: release.htmlUrl,
+                    githubDownloadUrl = apkAsset?.downloadUrl,
+                    giteeDownloadUrl = null,
                     publishedAt = release.publishedAt
                 )
             } else {
@@ -203,7 +321,8 @@ class GitHubReleaseService(
                 UpdateCheckResult.UpdateAvailable(
                     latestVersion = latestVersion,
                     releaseNotes = release.body,
-                    downloadUrl = apkAsset?.downloadUrl ?: release.htmlUrl,
+                    githubDownloadUrl = null,
+                    giteeDownloadUrl = apkAsset?.downloadUrl,
                     publishedAt = release.createdAt
                 )
             } else {

@@ -21,9 +21,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.NewReleases
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -34,14 +37,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -69,9 +77,27 @@ fun UpdateCheckScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    var showDownloadDialog by remember { mutableStateOf(false) }
     
     LaunchedEffect(Unit) {
         viewModel.loadCurrentReleaseInfo()
+    }
+    
+    if (showDownloadDialog && uiState.updateResult is UpdateCheckResult.UpdateAvailable) {
+        val updateResult = uiState.updateResult as UpdateCheckResult.UpdateAvailable
+        DownloadSourceDialog(
+            githubUrl = updateResult.githubDownloadUrl,
+            giteeUrl = updateResult.giteeDownloadUrl,
+            githubLatency = uiState.githubLatency,
+            giteeLatency = uiState.giteeLatency,
+            isMeasuringLatency = uiState.isMeasuringLatency,
+            onDismiss = { showDownloadDialog = false },
+            onDownload = { url ->
+                showDownloadDialog = false
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                context.startActivity(intent)
+            }
+        )
     }
     
     Scaffold(
@@ -115,9 +141,9 @@ fun UpdateCheckScreen(
             UpdateStatusCard(
                 isChecking = uiState.isChecking,
                 updateResult = uiState.updateResult,
-                onDownload = { url ->
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                    context.startActivity(intent)
+                onDownload = { 
+                    showDownloadDialog = true
+                    viewModel.measureNetworkLatency()
                 },
                 onRetry = { viewModel.checkForUpdate() }
             )
@@ -195,7 +221,7 @@ private fun CurrentVersionCard(
 private fun UpdateStatusCard(
     isChecking: Boolean,
     updateResult: UpdateCheckResult?,
-    onDownload: (String) -> Unit,
+    onDownload: () -> Unit,
     onRetry: () -> Unit
 ) {
     Card(
@@ -264,7 +290,7 @@ private fun UpdateStatusCard(
                         Spacer(modifier = Modifier.height(16.dp))
                         
                         Button(
-                            onClick = { onDownload(result.downloadUrl) },
+                            onClick = onDownload,
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Primary
@@ -420,91 +446,332 @@ private fun parseMarkdown(markdown: String): AnnotatedString {
     return buildAnnotatedString {
         val lines = markdown.lines()
         
-        lines.forEachIndexed { index, line ->
+        lines.forEachIndexed { lineIndex, line ->
+            var processedLine = line
+            var linePrefix = ""
+            
             when {
-                line.startsWith("### ") -> {
+                processedLine.startsWith("### ") -> {
+                    linePrefix = ""
                     withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 16.sp)) {
-                        append(line.removePrefix("### "))
+                        append(processedLine.removePrefix("### "))
                     }
                 }
-                line.startsWith("## ") -> {
+                processedLine.startsWith("## ") -> {
+                    linePrefix = ""
                     withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp)) {
-                        append(line.removePrefix("## "))
+                        append(processedLine.removePrefix("## "))
                     }
                 }
-                line.startsWith("# ") -> {
+                processedLine.startsWith("# ") -> {
+                    linePrefix = ""
                     withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 20.sp)) {
-                        append(line.removePrefix("# "))
+                        append(processedLine.removePrefix("# "))
                     }
                 }
-                line.startsWith("- ") || line.startsWith("* ") -> {
-                    append("• ")
-                    append(line.removePrefix("- ").removePrefix("* "))
+                processedLine.startsWith("- ") -> {
+                    linePrefix = "• "
+                    processedLine = processedLine.removePrefix("- ")
+                    append(linePrefix)
+                    appendInlineFormattedText(processedLine)
                 }
-                line.startsWith("**") && line.endsWith("**") -> {
-                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                        append(line.removePrefix("**").removeSuffix("**"))
-                    }
-                }
-                line.startsWith("*") && line.endsWith("*") && !line.startsWith("**") -> {
-                    withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
-                        append(line.removePrefix("*").removeSuffix("*"))
-                    }
-                }
-                line.startsWith("`") && line.endsWith("`") -> {
-                    withStyle(SpanStyle(
-                        background = androidx.compose.ui.graphics.Color.Gray.copy(alpha = 0.2f),
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                    )) {
-                        append(line.removePrefix("`").removeSuffix("`"))
-                    }
+                processedLine.startsWith("* ") -> {
+                    linePrefix = "• "
+                    processedLine = processedLine.removePrefix("* ")
+                    append(linePrefix)
+                    appendInlineFormattedText(processedLine)
                 }
                 else -> {
-                    val text = line
-                    var currentPos = 0
-                    val boldPattern = Regex("\\*\\*(.+?)\\*\\*")
-                    val italicPattern = Regex("\\*(.+?)\\*")
-                    val codePattern = Regex("`(.+?)`")
-                    
-                    var processedText = text
-                    var lastEnd = 0
-                    
-                    val allMatches = mutableListOf<Pair<IntRange, SpanStyle>>()
-                    
-                    boldPattern.findAll(text).forEach { match ->
-                        allMatches.add(match.range to SpanStyle(fontWeight = FontWeight.Bold))
-                    }
-                    italicPattern.findAll(text).forEach { match ->
-                        allMatches.add(match.range to SpanStyle(fontStyle = FontStyle.Italic))
-                    }
-                    codePattern.findAll(text).forEach { match ->
-                        allMatches.add(match.range to SpanStyle(
-                            background = androidx.compose.ui.graphics.Color.Gray.copy(alpha = 0.2f),
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                        ))
-                    }
-                    
-                    allMatches.sortedBy { it.first.first }.forEach { (range, style) ->
-                        if (range.first >= lastEnd) {
-                            append(text.substring(lastEnd, range.first))
-                            withStyle(style) {
-                                val content = text.substring(range.first, range.last + 1)
-                                append(content.removePrefix("**").removeSuffix("**")
-                                    .removePrefix("*").removeSuffix("*")
-                                    .removePrefix("`").removeSuffix("`"))
-                            }
-                            lastEnd = range.last + 1
-                        }
-                    }
-                    
-                    if (lastEnd < text.length) {
-                        append(text.substring(lastEnd))
-                    }
+                    appendInlineFormattedText(processedLine)
                 }
             }
             
-            if (index < lines.size - 1) {
+            if (lineIndex < lines.size - 1) {
                 append("\n")
+            }
+        }
+    }
+}
+
+private fun AnnotatedString.Builder.appendInlineFormattedText(text: String) {
+    val boldPattern = Regex("\\*\\*(.+?)\\*\\*")
+    val italicPattern = Regex("(?<!\\*)\\*(?!\\*)(.+?)(?<!\\*)\\*(?!\\*)")
+    val codePattern = Regex("`(.+?)`")
+    
+    data class MatchInfo(
+        val range: IntRange,
+        val style: SpanStyle,
+        val contentStart: Int,
+        val contentEnd: Int
+    )
+    
+    val allMatches = mutableListOf<MatchInfo>()
+    
+    boldPattern.findAll(text).forEach { match ->
+        allMatches.add(MatchInfo(
+            range = match.range,
+            style = SpanStyle(fontWeight = FontWeight.Bold),
+            contentStart = match.range.first + 2,
+            contentEnd = match.range.last - 1
+        ))
+    }
+    
+    italicPattern.findAll(text).forEach { match ->
+        allMatches.add(MatchInfo(
+            range = match.range,
+            style = SpanStyle(fontStyle = FontStyle.Italic),
+            contentStart = match.range.first + 1,
+            contentEnd = match.range.last - 1
+        ))
+    }
+    
+    codePattern.findAll(text).forEach { match ->
+        allMatches.add(MatchInfo(
+            range = match.range,
+            style = SpanStyle(
+                background = androidx.compose.ui.graphics.Color.Gray.copy(alpha = 0.2f),
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+            ),
+            contentStart = match.range.first + 1,
+            contentEnd = match.range.last - 1
+        ))
+    }
+    
+    if (allMatches.isEmpty()) {
+        append(text)
+        return
+    }
+    
+    val sortedMatches = allMatches.sortedBy { it.range.first }
+    val mergedMatches = mutableListOf<MatchInfo>()
+    for (match in sortedMatches) {
+        val overlaps = mergedMatches.any { existing ->
+            match.range.first < existing.range.last && match.range.last > existing.range.first
+        }
+        if (!overlaps) {
+            mergedMatches.add(match)
+        }
+    }
+    
+    var lastEnd = 0
+    
+    mergedMatches.sortedBy { it.range.first }.forEach { match ->
+        if (match.range.first > lastEnd) {
+            append(text.substring(lastEnd, match.range.first))
+        }
+        
+        withStyle(match.style) {
+            append(text.substring(match.contentStart, match.contentEnd))
+        }
+        
+        lastEnd = match.range.last + 1
+    }
+    
+    if (lastEnd < text.length) {
+        append(text.substring(lastEnd))
+    }
+}
+
+@Composable
+private fun DownloadSourceDialog(
+    githubUrl: String?,
+    giteeUrl: String?,
+    githubLatency: Long?,
+    giteeLatency: Long?,
+    isMeasuringLatency: Boolean,
+    onDismiss: () -> Unit,
+    onDownload: (String) -> Unit
+) {
+    var selectedSource by remember { mutableStateOf(if (githubUrl != null) "github" else "gitee") }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(20.dp),
+        title = {
+            Text(
+                text = "选择下载源",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "请选择下载更新的服务器：",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    if (isMeasuringLatency) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                color = Primary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "测速中",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                if (githubUrl != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selectedSource == "github",
+                            onClick = { selectedSource = "github" }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "GitHub",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                LatencyIndicator(latency = githubLatency, isMeasuring = isMeasuringLatency)
+                            }
+                            Text(
+                                text = "国际线路，推荐海外用户使用",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+                
+                if (giteeUrl != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selectedSource == "gitee",
+                            onClick = { selectedSource = "gitee" }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Gitee",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                LatencyIndicator(latency = giteeLatency, isMeasuring = isMeasuringLatency)
+                            }
+                            Text(
+                                text = "国内线路，推荐国内用户使用",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val url = when (selectedSource) {
+                        "github" -> githubUrl ?: giteeUrl
+                        else -> giteeUrl ?: githubUrl
+                    }
+                    url?.let { onDownload(it) }
+                },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Primary)
+            ) {
+                Text("开始下载")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+@Composable
+private fun LatencyIndicator(
+    latency: Long?,
+    isMeasuring: Boolean
+) {
+    when {
+        isMeasuring -> {
+            CircularProgressIndicator(
+                modifier = Modifier.size(12.dp),
+                color = TextSecondary,
+                strokeWidth = 1.5.dp
+            )
+        }
+        latency != null -> {
+            val color = when {
+                latency < 200 -> Color(0xFF4CAF50)
+                latency < 500 -> Color(0xFFFFA726)
+                else -> Color(0xFFEF5350)
+            }
+            val status = when {
+                latency < 200 -> "极快"
+                latency < 500 -> "较快"
+                else -> "较慢"
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(color, RoundedCornerShape(3.dp))
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "${latency}ms $status",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = color
+                )
+            }
+        }
+        else -> {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(Color(0xFFEF5350), RoundedCornerShape(3.dp))
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "不可用",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFFEF5350)
+                )
             }
         }
     }
