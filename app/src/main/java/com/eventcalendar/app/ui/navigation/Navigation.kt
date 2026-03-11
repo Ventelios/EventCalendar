@@ -1,5 +1,6 @@
 package com.eventcalendar.app.ui.navigation
 
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BarChart
@@ -57,6 +58,7 @@ fun EventCalendarNavHost() {
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(
