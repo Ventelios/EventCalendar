@@ -68,7 +68,7 @@ data class ReleaseInfo(
 class GitHubReleaseService(
     private val githubOwner: String = "Ventelios",
     private val githubRepo: String = "EventCalendar",
-    private val giteeOwner: String = "ventelios",
+    private val giteeOwner: String = "Ventelios",
     private val giteeRepo: String = "EventCalendar"
 ) {
     private val client = OkHttpClient.Builder()
