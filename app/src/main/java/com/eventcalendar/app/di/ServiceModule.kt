@@ -10,13 +10,10 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object ServiceModule {
-
+    
     @Provides
     @Singleton
     fun provideGitHubReleaseService(): GitHubReleaseService {
-        return GitHubReleaseService(
-            owner = "Ventelios",
-            repo = "EventCalendar"
-        )
+        return GitHubReleaseService()
     }
 }

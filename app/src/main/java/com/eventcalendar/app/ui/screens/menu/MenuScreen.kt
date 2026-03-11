@@ -22,7 +22,6 @@ import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,7 +40,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.eventcalendar.app.data.service.UpdateCheckResult
 import com.eventcalendar.app.ui.theme.Primary
 import com.eventcalendar.app.ui.theme.TextSecondary
 
@@ -84,11 +82,59 @@ fun MenuScreen(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            VersionInfoCard(
-                currentVersion = uiState.currentVersion,
-                isChecking = uiState.isChecking,
-                onCheckUpdate = { viewModel.checkForUpdate() }
-            )
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { navController.navigate("update_check") },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Primary.copy(alpha = 0.1f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(Primary.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Rounded.SystemUpdate,
+                            contentDescription = null,
+                            tint = Primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "检查更新",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = Primary
+                        )
+                        Text(
+                            text = "当前版本: v${uiState.currentVersion}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+
+                    Icon(
+                        Icons.Rounded.ChevronRight,
+                        contentDescription = null,
+                        tint = Primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
 
             Card(
                 modifier = Modifier
@@ -184,99 +230,6 @@ fun MenuScreen(
                         modifier = Modifier.size(20.dp)
                     )
                 }
-            }
-        }
-    }
-
-    when (val result = uiState.updateResult) {
-        is UpdateCheckResult.UpdateAvailable -> {
-            UpdateDialog(
-                updateResult = result,
-                onDismiss = { viewModel.clearUpdateResult() }
-            )
-        }
-        is UpdateCheckResult.NoUpdate -> {
-            NoUpdateDialog(
-                currentVersion = uiState.currentVersion,
-                onDismiss = { viewModel.clearUpdateResult() }
-            )
-        }
-        is UpdateCheckResult.Error -> {
-            UpdateErrorDialog(
-                message = result.message,
-                onDismiss = { viewModel.clearUpdateResult() }
-            )
-        }
-        null -> {}
-    }
-}
-
-@Composable
-private fun VersionInfoCard(
-    currentVersion: String,
-    isChecking: Boolean,
-    onCheckUpdate: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = !isChecking) { onCheckUpdate() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Primary.copy(alpha = 0.1f)
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(Primary.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isChecking) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = Primary,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        Icons.Rounded.SystemUpdate,
-                        contentDescription = null,
-                        tint = Primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = if (isChecking) "检查更新中..." else "检查更新",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = Primary
-                )
-                Text(
-                    text = "当前版本: v$currentVersion",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-            }
-
-            if (!isChecking) {
-                Icon(
-                    Icons.Rounded.ChevronRight,
-                    contentDescription = null,
-                    tint = Primary,
-                    modifier = Modifier.size(20.dp)
-                )
             }
         }
     }

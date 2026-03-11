@@ -30,6 +30,7 @@ import com.eventcalendar.app.ui.screens.eventtypes.EventTypesScreen
 import com.eventcalendar.app.ui.screens.history.HistoryScreen
 import com.eventcalendar.app.ui.screens.menu.AboutAuthorScreen
 import com.eventcalendar.app.ui.screens.menu.MenuScreen
+import com.eventcalendar.app.ui.screens.menu.UpdateCheckScreen
 import com.eventcalendar.app.ui.screens.statistics.StatisticsScreen
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
@@ -117,6 +118,9 @@ fun EventCalendarNavHost() {
             }
             composable("about_author") {
                 AboutAuthorScreen(navController = navController)
+            }
+            composable("update_check") {
+                UpdateCheckScreen(navController = navController)
             }
             composable("data_management") {
                 DataManagementScreen(navController = navController)
