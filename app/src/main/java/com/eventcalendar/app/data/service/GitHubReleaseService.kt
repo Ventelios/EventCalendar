@@ -123,6 +123,7 @@ class GitHubReleaseService(
             val release = gson.fromJson(responseBody, GitHubRelease::class.java)
             
             val apkAsset = release.assets.find { 
+                it.name.startsWith("PulseTempo-Release-", ignoreCase = true) && 
                 it.name.endsWith(".apk", ignoreCase = true) 
             }
             
@@ -157,6 +158,7 @@ class GitHubReleaseService(
             val release = gson.fromJson(responseBody, GiteeRelease::class.java)
             
             val apkAsset = release.assets.find { 
+                it.name.startsWith("PulseTempo-Release-", ignoreCase = true) && 
                 it.name.endsWith(".apk", ignoreCase = true) 
             }
             
@@ -192,11 +194,31 @@ class GitHubReleaseService(
                 val githubUpdate = githubResult as? UpdateCheckResult.UpdateAvailable
                 val giteeUpdate = giteeResult as? UpdateCheckResult.UpdateAvailable
                 
+                val latestVersion = when {
+                    githubUpdate != null && giteeUpdate != null -> {
+                        if (compareVersions(githubUpdate.latestVersion, giteeUpdate.latestVersion) >= 0) {
+                            githubUpdate.latestVersion
+                        } else {
+                            giteeUpdate.latestVersion
+                        }
+                    }
+                    githubUpdate != null -> githubUpdate.latestVersion
+                    giteeUpdate != null -> giteeUpdate.latestVersion
+                    else -> ""
+                }
+                
+                val githubUrl = githubUpdate?.githubDownloadUrl
+                val giteeUrl = if (giteeUpdate != null && giteeUpdate.latestVersion == latestVersion) {
+                    giteeUpdate.giteeDownloadUrl
+                } else {
+                    null
+                }
+                
                 UpdateCheckResult.UpdateAvailable(
-                    latestVersion = githubUpdate?.latestVersion ?: giteeUpdate?.latestVersion ?: "",
+                    latestVersion = latestVersion,
                     releaseNotes = githubUpdate?.releaseNotes ?: giteeUpdate?.releaseNotes ?: "",
-                    githubDownloadUrl = githubUpdate?.githubDownloadUrl,
-                    giteeDownloadUrl = giteeUpdate?.giteeDownloadUrl,
+                    githubDownloadUrl = githubUrl,
+                    giteeDownloadUrl = giteeUrl,
                     publishedAt = githubUpdate?.publishedAt ?: giteeUpdate?.publishedAt ?: ""
                 )
             }
@@ -243,11 +265,12 @@ class GitHubReleaseService(
             val url = "https://gitee.com/api/v5/repos/$giteeOwner/$giteeRepo/releases/latest"
             val request = Request.Builder()
                 .url(url)
-                .head()
                 .build()
             
             val response = client.newCall(request).execute()
             val latency = System.currentTimeMillis() - startTime
+            
+            response.body?.close()
             
             NetworkStatus(
                 available = response.isSuccessful,
@@ -279,6 +302,7 @@ class GitHubReleaseService(
             
             if (compareVersions(latestVersion, currentVersion) > 0) {
                 val apkAsset = release.assets.find { 
+                    it.name.startsWith("PulseTempo-Release-", ignoreCase = true) && 
                     it.name.endsWith(".apk", ignoreCase = true) 
                 }
                 
@@ -315,6 +339,7 @@ class GitHubReleaseService(
             
             if (compareVersions(latestVersion, currentVersion) > 0) {
                 val apkAsset = release.assets.find { 
+                    it.name.startsWith("PulseTempo-Release-", ignoreCase = true) && 
                     it.name.endsWith(".apk", ignoreCase = true) 
                 }
                 

@@ -130,8 +130,20 @@ class EventRepository @Inject constructor(
         return eventRecordDao.getCountByTimeRange(startTime, endTime)
     }
 
+    suspend fun getEventCountByTypeAndTimeRange(startTime: Long, endTime: Long, eventTypeId: Long): Int {
+        return eventRecordDao.getCountByTypeAndTimeRange(startTime, endTime, eventTypeId)
+    }
+
     suspend fun getRecordsByTimeRange(startTime: Long, endTime: Long): List<EventRecord> {
         return eventRecordDao.getRecordsByTimeRange(startTime, endTime)
+    }
+
+    suspend fun getRecentRecordsWithTypes(startTime: Long, endTime: Long, limit: Int): List<EventWithType> {
+        val records = eventRecordDao.getRecentRecordsByTimeRange(startTime, endTime, limit)
+        return records.mapNotNull { record ->
+            val eventType = eventTypeDao.getById(record.eventTypeId)
+            eventType?.let { EventWithType(record, it) }
+        }
     }
 
     private fun getRecordsWithType(recordsFlow: Flow<List<EventRecord>>): Flow<List<EventWithType>> {

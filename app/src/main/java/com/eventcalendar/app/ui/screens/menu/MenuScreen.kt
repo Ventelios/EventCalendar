@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Storage
@@ -23,6 +24,8 @@ import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,13 +36,18 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.eventcalendar.app.data.local.PreferencesManager
 import com.eventcalendar.app.ui.theme.Primary
 import com.eventcalendar.app.ui.theme.TextSecondary
 
@@ -50,6 +58,13 @@ fun MenuScreen(
     viewModel: UpdateCheckViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val preferencesManager = remember { PreferencesManager(context) }
+
+    // Read current preference
+    var statsDefaultMode by remember {
+        mutableStateOf(preferencesManager.defaultStatisticsMode)
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -82,6 +97,101 @@ fun MenuScreen(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // ── Statistics default view mode ──────────────────────
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(Primary.copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Rounded.BarChart,
+                                contentDescription = null,
+                                tint = Primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            text = "统计默认视图",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = statsDefaultMode == "recent",
+                            onClick = {
+                                statsDefaultMode = "recent"
+                                preferencesManager.defaultStatisticsMode = "recent"
+                            },
+                            label = {
+                                Text(
+                                    text = "近期模式",
+                                    fontWeight = if (statsDefaultMode == "recent") FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Primary.copy(alpha = 0.15f),
+                                selectedLabelColor = Primary
+                            ),
+                            shape = RoundedCornerShape(20.dp),
+                            border = FilterChipDefaults.filterChipBorder(
+                                borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                selectedBorderColor = Primary,
+                                enabled = true,
+                                selected = statsDefaultMode == "recent"
+                            )
+                        )
+                        FilterChip(
+                            selected = statsDefaultMode == "cumulative",
+                            onClick = {
+                                statsDefaultMode = "cumulative"
+                                preferencesManager.defaultStatisticsMode = "cumulative"
+                            },
+                            label = {
+                                Text(
+                                    text = "累计模式",
+                                    fontWeight = if (statsDefaultMode == "cumulative") FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Primary.copy(alpha = 0.15f),
+                                selectedLabelColor = Primary
+                            ),
+                            shape = RoundedCornerShape(20.dp),
+                            border = FilterChipDefaults.filterChipBorder(
+                                borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                selectedBorderColor = Primary,
+                                enabled = true,
+                                selected = statsDefaultMode == "cumulative"
+                            )
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ── Data management ───────────────────────────────────
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -132,6 +242,7 @@ fun MenuScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // ── Update check ──────────────────────────────────────
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -186,6 +297,7 @@ fun MenuScreen(
                 }
             }
 
+            // ── About ─────────────────────────────────────────────
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
