@@ -19,7 +19,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Code
-import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Card
@@ -97,10 +96,6 @@ fun AboutAuthorScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             AcknowledgmentsCard()
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            CreditsSection()
 
             Spacer(modifier = Modifier.height(40.dp))
         }
@@ -245,10 +240,13 @@ private fun AcknowledgmentsCard() {
             Spacer(modifier = Modifier.height(20.dp))
 
             val acknowledgments = listOf(
-                "MiniMax-M2.5",
-                "GLM-5",
-                "Kimi-K2.5",
-                "Qwen3.5-Plus"
+                "DeepSeek",
+                "GLM",
+                "Kimi",
+                "Qwen",
+                "MiniMax",
+                "Codex",
+                "Claude Code"
             )
 
             acknowledgments.forEachIndexed { index, name ->
@@ -294,71 +292,6 @@ private fun AcknowledgmentItem(
                     .width(1.dp)
                     .height(24.dp)
                     .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            )
-        }
-    }
-}
-
-@Composable
-private fun CreditsSection() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Rounded.Favorite,
-                    contentDescription = null,
-                    tint = Color(0xFFE91E63),
-                    modifier = Modifier.size(20.dp)
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Text(
-                    text = "特别感谢",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "TRAE",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = Primary
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "AI 编程助手",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "感谢字节跳动 TRAE 提供的智能编程支持，\n让开发更加高效便捷",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary,
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp
             )
         }
     }
